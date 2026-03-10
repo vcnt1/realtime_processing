@@ -47,14 +47,14 @@ O dashboard deve conter as seguintes seções:
 ## Critério principal de avaliação
 - Clareza do fluxo fim a fim e consistência dos indicadores apresentados.
 
-# Arquitetura implementada
+## Arquitetura implementada
 
 Fluxo fim a fim:
 
 1. `generate_seed_dataset.py` gera a base inicial de pedidos e metas.
 2. `bootstrap_seed.py` publica a seed no Kafka e envia os CSVs para o MinIO.
 3. `stream_generator.py` continua produzindo eventos em tempo real no tópico `blackfriday_orders`.
-4. `stream_processor.py` consome o Kafka em micro-batches, grava camadas Bronze e Silver em parquet e publica um snapshot Gold para o dashboard.
+4. `stream_processor_spark.py` consome o Kafka com Spark Structured Streaming, grava camadas Bronze e Silver em parquet e publica um snapshot Gold para o dashboard.
 5. `dashboard.py` lê o snapshot consolidado e exibe as seções de C-Level, Vendas e Controladoria.
 
 ### Camadas de dados
@@ -62,6 +62,20 @@ Fluxo fim a fim:
 - Bronze: parquet com os eventos brutos recebidos do Kafka.
 - Silver: parquet com o schema tratado e métricas derivadas por pedido.
 - Gold: snapshot JSON com agregações prontas para o dashboard.
+
+### Engine de streaming
+
+- O processamento principal usa Spark Structured Streaming em modo local dentro do container `bf-processor-spark`.
+- A leitura é feita diretamente do Kafka no tópico `blackfriday_orders`.
+- O dashboard continua consumindo o mesmo contrato de snapshot JSON, entao a troca de engine nao muda a camada de visualizacao
+- O pipeline esta funcional, mas ainda fica atras do trigger de 3 segundos.
+- No estado atual, os micro-batches costumam levar cerca de 8 a 10 segundos.
+
+### Melhorias possiveis
+
+- Aumentar o trigger do Spark para refletir melhor o tempo real de processamento.
+- Reduzir a quantidade de agregacoes executadas a cada micro-batch.
+- Compactar ou desacoplar parte das escritas de Bronze e Silver.
 
 ### Indicadores calculados
 
@@ -85,13 +99,13 @@ Alvos principais:
 - `make build`: reconstrói as imagens da aplicacao.
 - `make infra`: sobe Zookeeper, Kafka e MinIO.
 - `make seed`: prepara o topico e publica a seed inicial, com rebuild das imagens bootstrap.
-- `make app`: sobe generator, processor e dashboard, com rebuild das imagens de runtime.
+- `make app`: sobe generator, Spark processor e dashboard, com rebuild das imagens de runtime.
 - `make up`: executa o fluxo completo com rebuild.
 - `make ps`: mostra o estado dos containers.
 - `make logs`: acompanha logs do bootstrap e dos servicos principais.
 - `make logs-bootstrap`: mostra apenas logs de `bf-topic-init` e `bf-seed-bootstrap`.
 - `make down`: derruba o ambiente.
-- `make clean`: derruba o ambiente e remove apenas artefatos locais em `trabalho/data/out`.
+- `make clean`: derruba o ambiente e remove artefatos locais em `trabalho/data/out`, mesmo se eles tiverem sido criados por containers.
 - `make reset`: derruba o ambiente, remove volumes Docker e limpa `trabalho/data/out`.
 
 Servers hospedados em:

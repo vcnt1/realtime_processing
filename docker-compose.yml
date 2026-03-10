@@ -321,11 +321,52 @@ services:
     command: ["python", "src/stream_processor.py"]
     restart: unless-stopped
 
+  bf-processor-spark:
+    build:
+      context: ./trabalho
+      dockerfile: spark/Dockerfile
+    container_name: bf-processor-spark
+    working_dir: /app
+    environment:
+      PYTHONUNBUFFERED: "1"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-2:29093,kafka-3:29094
+      KAFKA_TOPIC_ORDERS: blackfriday_orders
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: lakehouse
+      DASHBOARD_METRICS_KEY: metrics/dashboard_latest.json
+      BRONZE_EVENTS_DIR: /app/data/out/bronze/orders_events
+      SILVER_EVENTS_DIR: /app/data/out/silver/orders_events
+      DASHBOARD_METRICS_LOCAL_PATH: /app/data/out/dashboard/dashboard_latest.json
+      SPARK_CHECKPOINT_DIR: /app/data/out/checkpoints/processor_spark
+      PROCESSOR_FLUSH_SECONDS: "3"
+    volumes:
+      - ./trabalho/app/src:/app/src
+      - ./trabalho/data:/app/data
+    depends_on:
+      bf-seed-bootstrap:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_started
+      kafka-2:
+        condition: service_started
+      kafka-3:
+        condition: service_started
+      minio:
+        condition: service_started
+    command:
+      - spark-submit
+      - --packages
+      - org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5
+      - src/stream_processor_spark.py
+    restart: unless-stopped
+
   bf-dashboard:
     <<: *bf-app-common
     container_name: bf-dashboard
     depends_on:
-      bf-processor:
+      bf-processor-spark:
         condition: service_started
     command:
       - streamlit

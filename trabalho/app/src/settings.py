@@ -38,6 +38,12 @@ class Settings:
     dashboard_metrics_local_path: str = os.getenv(
         "DASHBOARD_METRICS_LOCAL_PATH", "/app/data/out/dashboard/dashboard_latest.json"
     )
+    dashboard_state_local_path: str = os.getenv(
+        "DASHBOARD_STATE_LOCAL_PATH", "/app/data/out/dashboard/dashboard_state.json"
+    )
+    spark_checkpoint_dir: str = os.getenv(
+        "SPARK_CHECKPOINT_DIR", "/app/data/out/checkpoints/processor_spark"
+    )
 
     seed_orders_path: str = os.getenv("SEED_ORDERS_PATH", "/app/data/seed/orders_seed.csv")
     seed_targets_path: str = os.getenv(
